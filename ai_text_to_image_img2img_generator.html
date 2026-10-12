@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuraCanvas - AI Text & Image to Image Studio</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#09090b',
+                        cardBg: '#121216',
+                        accent: '#8b5cf6',
+                        accentHover: '#7c3aed'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #09090b; }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.03); }
+        }
+        .glow-effect { animation: pulseGlow 4s infinite ease-in-out; }
+    </style>
+</head>
+<body class="bg-darkBg text-zinc-100 min-h-screen flex flex-col selection:bg-accent selection:text-white">
+
+    <header class="border-b border-zinc-800 bg-darkBg/80 backdrop-blur-md sticky top-0 z-50 px-4 lg:px-8 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                <i data-lucide="sparkles" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">AuraCanvas AI</h1>
+                <p class="text-xs text-zinc-400">Unfiltered Text-to-Image & Img2Img Studio</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button onclick="openHistoryModal()" class="flex items-center space-x-2 px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition text-sm font-medium border border-zinc-700/50">
+                <i data-lucide="history" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Gallery History</span>
+            </button>
+            <button onclick="randomPrompt()" class="flex items-center space-x-2 px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition text-sm font-medium border border-zinc-700/50">
+                <i data-lucide="wand-2" class="w-4 h-4 text-purple-400"></i>
+                <span class="hidden sm:inline">Inspire Me</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Controls Column (Left) -->
+        <div class="lg:col-span-5 space-y-6">
+            <div class="bg-cardBg border border-zinc-800/80 rounded-2xl p-5 lg:p-6 shadow-xl space-y-5">
+                
+                <!-- Generation Mode Selector -->
+                <div class="space-y-2">
+                    <label class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Generation Mode</label>
+                    <div class="grid grid-cols-2 gap-2 p-1 bg-zinc-900 rounded-xl border border-zinc-800">
+                        <button onclick="setMode('text2img', this)" id="modeTextBtn" class="mode-btn py-2 rounded-lg bg-accent text-white text-xs font-semibold transition flex items-center justify-center space-x-1.5">
+                            <i data-lucide="type" class="w-3.5 h-3.5"></i>
+                            <span>Text to Image</span>
+                        </button>
+                        <button onclick="setMode('img2img', this)" id="modeImgBtn" class="mode-btn py-2 rounded-lg text-zinc-400 hover:text-zinc-200 text-xs font-semibold transition flex items-center justify-center space-x-1.5">
+                            <i data-lucide="image-plus" class="w-3.5 h-3.5"></i>
+                            <span>Image to Image</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Image Upload Section -->
+                <div id="imageUploadSection" class="space-y-3 hidden">
+                    <div class="flex justify-between items-center">
+                        <label class="text-sm font-semibold text-zinc-200 flex items-center space-x-1.5">
+                            <i data-lucide="upload" class="w-4 h-4 text-accent"></i>
+                            <span>Base Source Image</span>
+                        </label>
+                        <button onclick="clearSourceImage()" id="clearImgBtn" class="text-xs text-rose-400 hover:text-rose-300 hidden font-medium">Remove</button>
+                    </div>
+                    
+                    <div id="dropzone" onclick="document.getElementById('fileInput').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)" class="border-2 border-dashed border-zinc-700 hover:border-accent bg-zinc-900/50 rounded-xl p-4 text-center cursor-pointer transition flex flex-col items-center justify-center min-h-[140px] relative overflow-hidden group">
+                        <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+                        
+                        <div id="dropzonePlaceholder" class="space-y-2">
+                            <div class="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center mx-auto text-zinc-400 group-hover:text-accent transition">
+                                <i data-lucide="upload-cloud" class="w-5 h-5"></i>
+                            </div>
+                            <div class="space-y-0.5">
+                                <p class="text-xs font-medium text-zinc-300">Click to upload base image or drop here</p>
+                                <p class="text-[10px] text-zinc-500">Will be transformed by AI diffusion</p>
+                            </div>
+                        </div>
+
+                        <div id="dropzonePreviewContainer" class="hidden absolute inset-0 w-full h-full bg-zinc-950 flex items-center justify-center">
+                            <img id="sourceImagePreview" src="" alt="Source preview" class="w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium">
+                                Click or drop to change base image
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transformation Strength -->
+                    <div class="space-y-1.5 pt-1">
+                        <div class="flex justify-between text-xs text-zinc-400">
+                            <span>Transformation Strength (Denoising)</span>
+                            <span id="strengthVal" class="font-mono text-zinc-200">0.70</span>
+                        </div>
+                        <input type="range" id="strengthSlider" min="0.1" max="0.95" step="0.05" value="0.70" oninput="document.getElementById('strengthVal').innerText = this.value" class="w-full accent-accent bg-zinc-800 rounded-lg appearance-none h-1.5 cursor-pointer">
+                        <div class="flex justify-between text-[10px] text-zinc-500">
+                            <span>Keep Base Composition</span>
+                            <span>Full Creative Freedom</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prompt Input -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label for="promptInput" class="text-sm font-semibold text-zinc-200 flex items-center space-x-1.5">
+                            <i data-lucide="text-cursor" class="w-4 h-4 text-accent"></i>
+                            <span id="promptLabel">Prompt (Names & Real People Supported)</span>
+                        </label>
+                        <span id="charCount" class="text-xs text-zinc-400">0 / 1000</span>
+                    </div>
+                    <textarea id="promptInput" rows="3" maxlength="1000" oninput="updateCharCount()" placeholder="Portrait of [Person's Name], professional studio lighting, hyper realistic 8k, detailed facial features..." class="w-full bg-zinc-900 border border-zinc-700/70 rounded-xl p-3.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition resize-none"></textarea>
+                </div>
+
+                <!-- Negative Prompt Input -->
+                <div class="space-y-2">
+                    <label for="negativePromptInput" class="text-sm font-semibold text-zinc-200 flex items-center space-x-1.5">
+                        <i data-lucide="ban" class="w-4 h-4 text-rose-400"></i>
+                        <span>Negative Prompt (Optional)</span>
+                    </label>
+                    <input type="text" id="negativePromptInput" placeholder="blurry, low quality, deformed, bad eyes..." class="w-full bg-zinc-900 border border-zinc-700/70 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition">
+                    
+                    <!-- Quick Negative Buttons -->
+                    <div class="flex flex-wrap gap-1.5 pt-1" id="quickNegativeButtons">
+                        <button type="button" onclick="toggleNegativeTag('blurry', this)" class="neg-tag-btn px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-[11px] font-medium border border-zinc-800 transition flex items-center space-x-1">
+                            <span>+ Blurry</span>
+                        </button>
+                        <button type="button" onclick="toggleNegativeTag('deformed', this)" class="neg-tag-btn px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-[11px] font-medium border border-zinc-800 transition flex items-center space-x-1">
+                            <span>+ Deformed</span>
+                        </button>
+                        <button type="button" onclick="toggleNegativeTag('extra limbs', this)" class="neg-tag-btn px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-[11px] font-medium border border-zinc-800 transition flex items-center space-x-1">
+                            <span>+ Extra Limbs</span>
+                        </button>
+                        <button type="button" onclick="toggleNegativeTag('bad eyes', this)" class="neg-tag-btn px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-[11px] font-medium border border-zinc-800 transition flex items-center space-x-1">
+                            <span>+ Bad Eyes</span>
+                        </button>
+                        <button type="button" onclick="toggleNegativeTag('watermark', this)" class="neg-tag-btn px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-400 text-[11px] font-medium border border-zinc-800 transition flex items-center space-x-1">
+                            <span>+ Watermark</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Style Preset Selector -->
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-zinc-200 flex items-center space-x-1.5">
+                        <i data-lucide="palette" class="w-4 h-4 text-purple-400"></i>
+                        <span>Artistic Style Preset</span>
+                    </label>
+                    <div class="grid grid-cols-3 gap-2" id="stylePresets">
+                        <button onclick="setStyle('None', this)" class="style-btn active px-3 py-2 rounded-lg bg-accent text-white text-xs font-medium border border-accent transition">None</button>
+                        <button onclick="setStyle('Celebrity Portrait', this)" class="style-btn px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-700/70 transition">Portrait</button>
+                        <button onclick="setStyle('Cyberpunk Neon', this)" class="style-btn px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-700/70 transition">Cyberpunk</button>
+                        <button onclick="setStyle('Cinematic Movie', this)" class="style-btn px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-700/70 transition">Cinematic</button>
+                        <button onclick="setStyle('Anime Manga', this)" class="style-btn px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-700/70 transition">Anime</button>
+                        <button onclick="setStyle('Oil Painting', this)" class="style-btn px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-700/70 transition">Oil Paint</button>
+                    </div>
+                </div>
+
+                <!-- Aspect Ratio Selector -->
+                <div id="aspectRatioSection" class="space-y-2">
+                    <label class="text-sm font-semibold text-zinc-200 flex items-center space-x-1.5">
+                        <i data-lucide="maximize" class="w-4 h-4 text-blue-400"></i>
+                        <span>Aspect Ratio</span>
+                    </label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button onclick="setRatio('1:1', 1024, 1024, this)" class="ratio-btn active px-3 py-2 rounded-lg bg-accent text-white text-xs font-medium border border-accent transition text-center">1:1 Square</button>
+                        <button onclick="setRatio('16:9', 1280, 720, this)" class="ratio-btn px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-700/70 transition text-center">16:9 Wide</button>
+                        <button onclick="setRatio('9:16', 720, 1280, this)" class="ratio-btn px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-700/70 transition text-center">9:16 Story</button>
+                        <button onclick="setRatio('4:3', 1024, 768, this)" class="ratio-btn px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-700/70 transition text-center">4:3 Photo</button>
+                    </div>
+                </div>
+
+                <!-- Advanced Engine Settings -->
+                <div class="pt-2 border-t border-zinc-800">
+                    <button onclick="toggleAdvanced()" class="flex items-center justify-between w-full text-xs font-medium text-zinc-400 hover:text-zinc-200 py-1 transition">
+                        <span class="flex items-center space-x-1.5">
+                            <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+                            <span>Advanced Diffusion Model Engine</span>
+                        </span>
+                        <i id="advancedChevron" data-lucide="chevron-down" class="w-4 h-4 transition-transform"></i>
+                    </button>
+                    <div id="advancedPanel" class="hidden mt-3 space-y-3 pt-2">
+                        <div class="space-y-1">
+                            <label class="text-xs text-zinc-400">Primary AI Model</label>
+                            <select id="engineSelect" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-accent">
+                                <option value="flux">FLUX.1 Schnell (High Quality Real-Time)</option>
+                                <option value="turbo">SDXL Turbo (Fast Diffusion)</option>
+                                <option value="flux-realism">FLUX Realism Portrait Engine</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button onclick="generateImage()" id="generateBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:opacity-95 text-white font-semibold shadow-lg shadow-purple-600/25 flex items-center justify-center space-x-2 transition transform active:scale-[0.99]">
+                    <i data-lucide="wand-sparkles" class="w-5 h-5"></i>
+                    <span id="generateBtnText">Generate Masterpiece</span>
+                </button>
+
+            </div>
+        </div>
+
+        <!-- Output Preview Column (Right) -->
+        <div class="lg:col-span-7 flex flex-col space-y-4">
+            <div id="outputContainer" class="flex-1 bg-cardBg border border-zinc-800/80 rounded-2xl p-6 shadow-xl flex flex-col items-center justify-center relative min-h-[480px] overflow-hidden">
+                
+                <!-- Initial State Placeholder -->
+                <div id="placeholderState" class="text-center space-y-4 max-w-md py-12">
+                    <div class="w-20 h-20 rounded-2xl bg-zinc-900/80 border border-zinc-800 flex items-center justify-center mx-auto text-zinc-600 glow-effect">
+                        <i data-lucide="image" class="w-10 h-10 text-zinc-500"></i>
+                    </div>
+                    <div class="space-y-1">
+                        <h3 class="text-base font-medium text-zinc-200">Ready to synthesize</h3>
+                        <p class="text-xs text-zinc-500">Type any name, character, or prompt to generate real AI artwork</p>
+                    </div>
+                </div>
+
+                <!-- Loading State -->
+                <div id="loadingState" class="hidden text-center space-y-4 max-w-md py-12">
+                    <div class="w-20 h-20 rounded-2xl bg-zinc-900/80 border border-zinc-800 flex items-center justify-center mx-auto text-accent glow-effect animate-spin">
+                        <i data-lucide="loader-2" class="w-10 h-10 text-accent"></i>
+                    </div>
+                    <div class="space-y-1">
+                        <h3 id="loadingText" class="text-base font-medium text-zinc-200">Generating AI Artwork...</h3>
+                        <p class="text-xs text-zinc-500">Synthesizing unique seed through Diffusion Engine</p>
+                    </div>
+                </div>
+
+                <!-- Result State -->
+                <div id="resultState" class="hidden w-full h-full flex flex-col items-center justify-center space-y-4">
+                    <div class="relative group rounded-xl overflow-hidden border border-zinc-800 shadow-2xl max-w-full bg-zinc-950 flex items-center justify-center min-h-[300px]">
+                        <img id="generatedImage" src="" alt="Generated AI Artwork" class="max-h-[550px] w-auto object-contain transition duration-300">
+                        
+                        <!-- Floating Controls on Hover -->
+                        <div class="absolute bottom-4 inset-x-4 flex items-center justify-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 backdrop-blur-md p-2 rounded-xl border border-white/10">
+                            <button onclick="downloadImage()" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium flex items-center space-x-1.5 transition">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                <span>Download</span>
+                            </button>
+                            <button onclick="copyPromptFromResult()" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium flex items-center space-x-1.5 transition">
+                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                                <span>Copy Prompt</span>
+                            </button>
+                            <button onclick="remixAsBase()" class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium flex items-center space-x-1.5 transition">
+                                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                                <span>Remix Base</span>
+                            </button>
+                            <button onclick="generateImage()" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium flex items-center space-x-1.5 transition">
+                                <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+                                <span>Re-roll</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Prompt Meta Details -->
+                    <div class="w-full bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-zinc-400">
+                        <div class="truncate max-w-xl">
+                            <span class="font-semibold text-zinc-300">Prompt:</span> <span id="resultPromptText" class="text-zinc-400"></span>
+                        </div>
+                        <div class="flex items-center space-x-3 shrink-0">
+                            <span id="resultMetaBadge" class="px-2 py-1 rounded bg-zinc-800 text-zinc-300 font-mono">1024x1024</span>
+                            <button onclick="downloadImage()" class="p-1.5 rounded-lg bg-accent hover:bg-accentHover text-white transition" title="Download Image">
+                                <i data-lucide="download" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- History Modal -->
+    <div id="historyModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-800 w-full max-w-4xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            <div class="px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="history" class="w-5 h-5 text-accent"></i>
+                    <h2 class="text-lg font-semibold text-zinc-200">Generation History</h2>
+                </div>
+                <button onclick="closeHistoryModal()" class="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div id="historyGrid" class="p-6 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 flex-1">
+                <!-- Dynamically populated history cards -->
+            </div>
+            <div class="px-6 py-3 border-t border-zinc-800 bg-zinc-900/50 flex justify-between items-center text-xs text-zinc-500">
+                <span>Stored locally in your browser session</span>
+                <button onclick="clearHistory()" class="text-rose-400 hover:text-rose-300 font-medium">Clear History</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let currentMode = 'text2img';
+        let selectedStyle = 'None';
+        let currentWidth = 1024;
+        let currentHeight = 1024;
+        let sourceImageDataUrl = null;
+        let currentFullPrompt = '';
+        let currentImageUrl = '';
+        let historyData = [];
+
+        try {
+            const saved = localStorage.getItem('auracanvas_history_v9');
+            if (saved) historyData = JSON.parse(saved);
+        } catch(e) {}
+
+        const styleModifiers = {
+            'Celebrity Portrait': 'professional studio portrait photography, highly detailed facial features, dramatic soft box lighting, 8k resolution, sharp focus, masterpiece',
+            'Cyberpunk Neon': 'cyberpunk style, vibrant neon lighting, futuristic city, highly detailed, sci-fi concept art',
+            'Cinematic Movie': 'cinematic movie still, dramatic lighting, highly detailed, photorealistic, 8k resolution, depth of field',
+            'Anime Manga': 'anime style, vibrant colors, detailed illustration, studio ghibli inspired, high quality artwork',
+            'Oil Painting': 'classic oil painting style, visible brush strokes, textured canvas, rich masterpiece color palette'
+        };
+
+        function updateCharCount() {
+            const promptInput = document.getElementById('promptInput');
+            const charCount = document.getElementById('charCount');
+            if (promptInput && charCount) {
+                charCount.innerText = `${promptInput.value.length} / 1000`;
+            }
+        }
+
+        function toggleNegativeTag(tag, btn) {
+            const input = document.getElementById('negativePromptInput');
+            if (!input) return;
+
+            let currentTags = input.value.split(',').map(t => t.trim()).filter(Boolean);
+            const tagIndex = currentTags.findIndex(t => t.toLowerCase() === tag.toLowerCase());
+
+            if (tagIndex > -1) {
+                currentTags.splice(tagIndex, 1);
+                btn.classList.remove('bg-rose-500/20', 'text-rose-300', 'border-rose-500/40');
+                btn.classList.add('bg-zinc-900', 'text-zinc-400', 'border-zinc-800');
+                btn.querySelector('span').innerText = `+ ${tag.charAt(0).toUpperCase() + tag.slice(1)}`;
+            } else {
+                currentTags.push(tag);
+                btn.classList.add('bg-rose-500/20', 'text-rose-300', 'border-rose-500/40');
+                btn.classList.remove('bg-zinc-900', 'text-zinc-400', 'border-zinc-800');
+                btn.querySelector('span').innerText = `✓ ${tag.charAt(0).toUpperCase() + tag.slice(1)}`;
+            }
+
+            input.value = currentTags.join(', ');
+        }
+
+        function setMode(mode, btn) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => {
+                b.classList.remove('bg-accent', 'text-white');
+                b.classList.add('text-zinc-400', 'hover:text-zinc-200');
+            });
+            btn.classList.add('bg-accent', 'text-white');
+            btn.classList.remove('text-zinc-400', 'hover:text-zinc-200');
+
+            const uploadSection = document.getElementById('imageUploadSection');
+            const promptLabel = document.getElementById('promptLabel');
+            const generateBtnText = document.getElementById('generateBtnText');
+
+            if (mode === 'img2img') {
+                uploadSection.classList.remove('hidden');
+                promptLabel.innerText = "Transformation Prompt (Names & Real People Supported)";
+                generateBtnText.innerText = "Transform Base Image";
+            } else {
+                uploadSection.classList.add('hidden');
+                promptLabel.innerText = "Prompt (Names & Real People Supported)";
+                generateBtnText.innerText = "Generate Masterpiece";
+            }
+        }
+
+        function setStyle(styleName, btn) {
+            selectedStyle = styleName;
+            document.querySelectorAll('.style-btn').forEach(b => {
+                b.classList.remove('bg-accent', 'text-white', 'border-accent');
+                b.classList.add('bg-zinc-900', 'text-zinc-300', 'border-zinc-700/70');
+            });
+            btn.classList.remove('bg-zinc-900', 'text-zinc-300', 'border-zinc-700/70');
+            btn.classList.add('bg-accent', 'text-white', 'border-accent');
+        }
+
+        function setRatio(label, w, h, btn) {
+            currentWidth = w;
+            currentHeight = h;
+            document.querySelectorAll('.ratio-btn').forEach(b => {
+                b.classList.remove('bg-accent', 'text-white', 'border-accent');
+                b.classList.add('bg-zinc-900', 'text-zinc-300', 'border-zinc-700/70');
+            });
+            btn.classList.remove('bg-zinc-900', 'text-zinc-300', 'border-zinc-700/70');
+            btn.classList.add('bg-accent', 'text-white', 'border-accent');
+        }
+
+        function toggleAdvanced() {
+            const panel = document.getElementById('advancedPanel');
+            const chevron = document.getElementById('advancedChevron');
+            panel.classList.toggle('hidden');
+            chevron.style.transform = panel.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+
+        function randomPrompt() {
+            const prompts = [
+                "Portrait of Elon Musk speaking at a futuristic tech conference, holographic displays, hyper realistic 8k",
+                "Cinematic portrait of Scarlett Johansson in a noir detective thriller, dramatic shadows, highly detailed",
+                "Keanu Reeves as a cyberpunk samurai in Neo Tokyo, neon reflections, masterpiece photograph",
+                "Morgan Freeman standing in a glowing cosmic observatory, wise expression, highly detailed portrait",
+                "A majestic cybernetic tiger walking through a neon-lit Tokyo alley in rain, cinematic lighting"
+            ];
+            const rand = prompts[Math.floor(Math.random() * prompts.length)];
+            document.getElementById('promptInput').value = rand;
+            updateCharCount();
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            document.getElementById('dropzone').classList.add('border-accent');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            document.getElementById('dropzone').classList.remove('border-accent');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            document.getElementById('dropzone').classList.remove('border-accent');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                processFile(e.dataTransfer.files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            if (e.target.files && e.target.files[0]) {
+                processFile(e.target.files[0]);
+            }
+        }
+
+        function processFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showToast("Please upload a valid image file.");
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                sourceImageDataUrl = e.target.result;
+                document.getElementById('sourceImagePreview').src = sourceImageDataUrl;
+                document.getElementById('dropzonePlaceholder').classList.add('hidden');
+                document.getElementById('dropzonePreviewContainer').classList.remove('hidden');
+                document.getElementById('clearImgBtn').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearSourceImage() {
+            sourceImageDataUrl = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('dropzonePlaceholder').classList.remove('hidden');
+            document.getElementById('dropzonePreviewContainer').classList.add('hidden');
+            document.getElementById('clearImgBtn').classList.add('hidden');
+        }
+
+        async function fetchDiffusionImage(fullPrompt, modelEngine, width, height, isImg2Img, baseImageData, strength) {
+            const uniqueSeed = Math.floor(Math.random() * 99999999);
+            const nonce = Date.now();
+            
+            let modelParam = 'flux';
+            if (modelEngine === 'turbo') modelParam = 'turbo';
+            if (modelEngine === 'flux-realism') modelParam = 'flux-realism';
+
+            const cleanPrompt = fullPrompt.replace(/[\n\r]+/g, ' ').trim();
+            const encodedPrompt = encodeURIComponent(`${cleanPrompt}, hyperrealistic portrait photograph, detailed skin texture, 8k studio photo`);
+            
+            const primaryUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${uniqueSeed}&nologo=true&model=${modelParam}&cache=false&_nonce=${nonce}`;
+
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'Anonymous';
+
+                const timeoutTimer = setTimeout(() => {
+                    resolve(primaryUrl);
+                }, 14000);
+
+                img.onload = () => {
+                    clearTimeout(timeoutTimer);
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+
+                        if (isImg2Img && baseImageData) {
+                            const baseImg = new Image();
+                            baseImg.crossOrigin = 'Anonymous';
+                            baseImg.onload = () => {
+                                ctx.drawImage(baseImg, 0, 0, width, height);
+                                ctx.globalAlpha = strength;
+                                ctx.drawImage(img, 0, 0, width, height);
+                                resolve(canvas.toDataURL('image/jpeg', 0.92));
+                            };
+                            baseImg.onerror = () => {
+                                ctx.drawImage(img, 0, 0, width, height);
+                                resolve(canvas.toDataURL('image/jpeg', 0.92));
+                            };
+                            baseImg.src = baseImageData;
+                        } else {
+                            ctx.drawImage(img, 0, 0, width, height);
+                            resolve(canvas.toDataURL('image/jpeg', 0.92));
+                        }
+                    } catch (e) {
+                        resolve(primaryUrl);
+                    }
+                };
+
+                img.onerror = () => {
+                    clearTimeout(timeoutTimer);
+                    resolve(primaryUrl);
+                };
+
+                img.src = primaryUrl;
+            });
+        }
+
+        async function generateImage() {
+            const promptInput = document.getElementById('promptInput').value.trim();
+            const negativePrompt = document.getElementById('negativePromptInput').value.trim();
+            const strength = parseFloat(document.getElementById('strengthSlider').value) || 0.70;
+            const modelEngine = document.getElementById('engineSelect').value || 'flux';
+
+            if (!promptInput && currentMode === 'text2img') {
+                showToast("Please enter a prompt or person's name to generate!");
+                document.getElementById('promptInput').focus();
+                return;
+            }
+
+            if (currentMode === 'img2img' && !sourceImageDataUrl) {
+                showToast("Please upload a base image for Image-to-Image mode!");
+                return;
+            }
+
+            document.getElementById('placeholderState').classList.add('hidden');
+            document.getElementById('resultState').classList.add('hidden');
+            document.getElementById('loadingState').classList.remove('hidden');
+            
+            const genBtn = document.getElementById('generateBtn');
+            genBtn.disabled = true;
+            genBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            try {
+                let fullPrompt = promptInput || "Portrait masterpiece";
+                if (selectedStyle !== 'None' && styleModifiers[selectedStyle]) {
+                    fullPrompt += ", " + styleModifiers[selectedStyle];
+                }
+                if (negativePrompt) {
+                    fullPrompt += " (without: " + negativePrompt + ")";
+                }
+                currentFullPrompt = fullPrompt;
+
+                const generatedDataUrl = await fetchDiffusionImage(
+                    fullPrompt,
+                    modelEngine,
+                    currentWidth,
+                    currentHeight,
+                    currentMode === 'img2img',
+                    sourceImageDataUrl,
+                    strength
+                );
+
+                currentImageUrl = generatedDataUrl;
+
+                const targetImg = document.getElementById('generatedImage');
+                await new Promise((resolve) => {
+                    targetImg.onload = () => resolve();
+                    targetImg.onerror = () => resolve();
+                    targetImg.src = generatedDataUrl;
+                });
+
+                document.getElementById('resultPromptText').innerText = fullPrompt;
+                document.getElementById('resultMetaBadge').innerText = `${currentWidth}x${currentHeight}`;
+
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('resultState').classList.remove('hidden');
+
+                saveToHistory(currentImageUrl, fullPrompt, `${currentWidth}x${currentHeight}`);
+                showToast("New AI Masterpiece generated!");
+
+            } catch (err) {
+                console.error("Generation error:", err);
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('placeholderState').classList.remove('hidden');
+                showToast("Generation failed. Please try again.");
+            } finally {
+                genBtn.disabled = false;
+                genBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        function remixAsBase() {
+            if (!currentImageUrl) return;
+            sourceImageDataUrl = currentImageUrl;
+            document.getElementById('sourceImagePreview').src = sourceImageDataUrl;
+            document.getElementById('dropzonePlaceholder').classList.add('hidden');
+            document.getElementById('dropzonePreviewContainer').classList.remove('hidden');
+            document.getElementById('clearImgBtn').classList.remove('hidden');
+            
+            setMode('img2img', document.getElementById('modeImgBtn'));
+            showToast("Loaded artwork as new base image!");
+        }
+
+        function downloadImage() {
+            if (!currentImageUrl) return;
+            const a = document.createElement('a');
+            a.href = currentImageUrl;
+            a.download = `auracanvas-${Date.now()}.jpg`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function copyPromptFromResult() {
+            if (!currentFullPrompt) return;
+            const textArea = document.createElement("textarea");
+            textArea.value = currentFullPrompt;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast("Prompt copied to clipboard!");
+            } catch (err) {
+                showToast("Failed to copy prompt.");
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function saveToHistory(imgUrl, promptText, ratio) {
+            historyData.unshift({
+                url: imgUrl,
+                prompt: promptText,
+                ratio: ratio,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+            if (historyData.length > 20) historyData.pop();
+            try {
+                localStorage.setItem('auracanvas_history_v9', JSON.stringify(historyData));
+            } catch(e) {}
+        }
+
+        function openHistoryModal() {
+            const grid = document.getElementById('historyGrid');
+            grid.innerHTML = '';
+            if (historyData.length === 0) {
+                grid.innerHTML = `<div class="col-span-full py-12 text-center text-zinc-500 text-sm">No generation history yet.</div>`;
+            } else {
+                historyData.forEach((item) => {
+                    const card = document.createElement('div');
+                    card.className = 'group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 aspect-square flex items-center justify-center cursor-pointer';
+                    card.innerHTML = `
+                        <img src="${item.url}" alt="${item.prompt}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end">
+                            <p class="text-xs text-white truncate font-medium">${item.prompt}</p>
+                            <span class="text-[10px] text-zinc-400">${item.ratio} • ${item.time}</span>
+                        </div>
+                    `;
+                    card.onclick = () => {
+                        currentImageUrl = item.url;
+                        document.getElementById('generatedImage').src = item.url;
+                        document.getElementById('resultPromptText').innerText = item.prompt;
+                        document.getElementById('resultMetaBadge').innerText = item.ratio;
+                        document.getElementById('placeholderState').classList.add('hidden');
+                        document.getElementById('loadingState').classList.add('hidden');
+                        document.getElementById('resultState').classList.remove('hidden');
+                        closeHistoryModal();
+                    };
+                    grid.appendChild(card);
+                });
+            }
+            document.getElementById('historyModal').classList.remove('hidden');
+            document.getElementById('historyModal').classList.add('flex');
+        }
+
+        function closeHistoryModal() {
+            document.getElementById('historyModal').classList.remove('flex');
+            document.getElementById('historyModal').classList.add('hidden');
+        }
+
+        function clearHistory() {
+            historyData = [];
+            localStorage.removeItem('auracanvas_history_v9');
+            openHistoryModal();
+            showToast("History cleared.");
+        }
+
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-5 right-5 z-50 bg-zinc-900 border border-zinc-700 text-zinc-100 px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-2 text-sm';
+            toast.innerHTML = `<i data-lucide="info" class="w-4 h-4 text-accent"></i><span>${message}</span>`;
+            document.body.appendChild(toast);
+            lucide.createIcons();
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
